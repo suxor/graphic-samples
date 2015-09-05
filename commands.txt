@@ -1,1 +1,1 @@
-gcc xcb-for-opengl.c -lxcb -lX11-xcb -lGL -lX11
+gcc xcb-for-opengl.c -lxcb -lX11-xcb -lGL -lX11 -lm
