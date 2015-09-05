@@ -10,6 +10,7 @@
 #include "samples.h"
 
 void draw() {
+    get_version();
     draw_circle();
 }
 
