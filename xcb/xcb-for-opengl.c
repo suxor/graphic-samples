@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <dlfcn.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xlib-xcb.h>
@@ -8,10 +9,21 @@
 //#include <GL/gl.h>
 
 #include "samples.h"
+typedef void (*DRAW_FUNC)();
+
+int g_argc = 0;
+char **g_argv = NULL;
 
 void draw() {
-    get_version();
-    draw_circle();
+    //get_version();
+    //draw_circle();
+    if (g_argc >= 2) {
+        DRAW_FUNC pf = (DRAW_FUNC)dlsym(0, g_argv[1]);
+        if (NULL != pf) {
+            fprintf(stderr, "call %s \n", g_argv[1]);
+            pf();
+        }
+    }
 }
 
 int main_loop(Display *display, xcb_connection_t *connection, xcb_window_t window, GLXDrawable drawable)
@@ -32,7 +44,6 @@ int main_loop(Display *display, xcb_connection_t *connection, xcb_window_t windo
                 break;
             case XCB_EXPOSE:
                 /* Handle expose event, draw and swap buffers */
-                fprintf(stderr, "draw\n");
                 draw();
                 glXSwapBuffers(display, drawable);
                 break;
@@ -142,6 +153,9 @@ int main(int argc, char *argv[])
 {
     Display *display;
     int default_screen, screen_num;
+
+    g_argc = argc;
+    g_argv = argv;
 
     /* Open Xlib Display */
     display = XOpenDisplay(0);
