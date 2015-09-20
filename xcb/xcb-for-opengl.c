@@ -45,6 +45,9 @@ void parseArgs(int argc, char *argv[])
     }
 }
 
+GLubyte letters[][13] = {
+    {0x00, 0x00, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0x66, 0x3c, 0x18},
+};
 
 void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t window) {
     if (NULL != testcase) {
@@ -90,25 +93,49 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
     }
     glClearColor(1.0, 1.0, 1.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
+    glFlush();
 
     glColor3f(1.0f, 0.0f, 0.0f);
     glRasterPos2f(0.0f, 0.0f);
+    glPushAttrib(GL_LIST_BIT);
 
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     static int isFirstCall = 1;
+    static GLuint lists;
+    if (isFirstCall) {
+        lists = glGenLists(128);
+    }
+#if 1 
+    //for (i = 0; i < sizeof(letters)
+    glNewList(lists + 'A', GL_COMPILE);
+    glBitmap(8, 13, 0.0, 2.0, 10.0, 0.0, letters[0]);
+    glEndList();
+    GLubyte *str = (GLubyte*)"A";
+#else
+    glXUseXFont(font, 0, 128, lists);
+    GLubyte *str = (GLubyte*)"Hello, world.";
+#endif
+    glListBase(lists);
+    glCallLists(strlen(str), GL_UNSIGNED_BYTE, str);
+    glPopAttrib();
+    glFlush();
+
+
+/*    static int isFirstCall = 1;
     static GLuint lists;
     //load font
     //gen list
     if (isFirstCall) {
-        lists = glGenLists(256);
-        glXUseXFont(font_for_text, 0, 256, lists);
+        lists = glGenLists(128);
     }
 
+    glXUseXFont(font, 0, 128, lists);
+    glListBase(lists);
     char *str = "Hello, world";
     for (; *str!='\0';++str) {
         glCallList(lists + *str);
     }
     glFlush();
-
     //glDeleteLists(lists, 256);
     //use font
     //draw text
