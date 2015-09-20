@@ -15,13 +15,15 @@ typedef void (*DRAW_FUNC)();
 char *testcase = NULL;
 int window_width = 800;
 int window_height = 600;
+Font font_for_text = 0;
+char *font_name_pattern = NULL;
+
 
 void parseArgs(int argc, char *argv[])
 {
    int oc;
-   char *opt_args;
 
-    while((oc = getopt(argc, argv, "wht:")) != -1) {
+    while((oc = getopt(argc, argv, "w:h:t:p:")) != -1) {
         switch(oc) {
         case 'w':
             window_width = atoi(optarg);
@@ -31,6 +33,9 @@ void parseArgs(int argc, char *argv[])
             break;
         case 't':
             testcase = optarg;
+            break;
+        case 'p':
+            font_name_pattern = optarg;
             break;
         default:
             fprintf(stderr, "unknown option character %c", oc);
@@ -46,8 +51,31 @@ void draw() {
         if (NULL != pf) {
             fprintf(stderr, "call %s \n", testcase);
             pf();
+            return;
         }
     }
+    get_version();
+
+    /*static int isFirstCall = 1;
+    static GLuint lists;
+    //load font
+    //gen list
+    //if (isFirstCall) {
+        lists = glGenLists(128);
+        glXUseXFont(font_for_text, 0, 128, lists);
+    //}
+
+    char *str = "Hello, world";
+    for (; *str!='\0';++str) {
+        glCallList(lists + *str);
+    }
+
+    glDeleteLists(lists, 128);
+    //use font
+    //draw text
+    //unuse font?
+    //delete list
+    //unload font*/
 }
 
 int main_loop(Display *display, xcb_connection_t *connection, xcb_window_t window, GLXDrawable drawable)
@@ -186,6 +214,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Can't open display\n");
         return -1;
     }
+    //font_for_text = XLoadFont(display, font_name_pattern);
 
     default_screen = DefaultScreen(display);
 
@@ -210,6 +239,7 @@ int main(int argc, char *argv[])
     /* Initialize window and OpenGL context, run main loop and deinitialize */
     int retval = setup_and_run(display, connection, default_screen, screen);
 
+    //XUnloadFont(display, font_for_text);
     /* Cleanup */
     XCloseDisplay(display);
 
