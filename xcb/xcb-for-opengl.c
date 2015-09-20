@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
+#include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xlib-xcb.h>
@@ -11,16 +12,39 @@
 #include "samples.h"
 typedef void (*DRAW_FUNC)();
 
-int g_argc = 0;
-char **g_argv = NULL;
+char *testcase = NULL;
+int window_width = 800;
+int window_height = 600;
+
+void parseArgs(int argc, char *argv[])
+{
+   int oc;
+   char *opt_args;
+
+    while((oc = getopt(argc, argv, "wht:")) != -1) {
+        switch(oc) {
+        case 'w':
+            window_width = atoi(optarg);
+            break;
+        case 'h':
+            window_height = atoi(optarg);
+            break;
+        case 't':
+            testcase = optarg;
+            break;
+        default:
+            fprintf(stderr, "unknown option character %c", oc);
+            break;
+        }
+    }
+}
+
 
 void draw() {
-    //get_version();
-    //draw_circle();
-    if (g_argc >= 2) {
-        DRAW_FUNC pf = (DRAW_FUNC)dlsym(0, g_argv[1]);
+    if (NULL != testcase) {
+        DRAW_FUNC pf = (DRAW_FUNC)dlsym(0, testcase);
         if (NULL != pf) {
-            fprintf(stderr, "call %s \n", g_argv[1]);
+            fprintf(stderr, "call %s \n", testcase);
             pf();
         }
     }
@@ -106,7 +130,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
         window,
         screen->root,
         0, 0,
-        150, 150,
+        window_width, window_height,
         0,
         XCB_WINDOW_CLASS_INPUT_OUTPUT,
         visualID,
@@ -148,14 +172,12 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
     return retval;
 }
 
-
 int main(int argc, char *argv[])
 {
     Display *display;
     int default_screen, screen_num;
 
-    g_argc = argc;
-    g_argv = argv;
+    parseArgs(argc, argv);
 
     /* Open Xlib Display */
     display = XOpenDisplay(0);
