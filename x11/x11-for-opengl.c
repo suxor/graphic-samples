@@ -2,16 +2,18 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <unistd.h>
-#include <string.h>
 
 #include <X11/Xlib.h>
-#include <X11/Xlib-xcb.h>
-#include <xcb/xcb.h>
 #include <GL/glx.h>
 //#include <GL/gl.h>
 
 #include "samples.h"
 typedef void (*DRAW_FUNC)();
+
+static int singleBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16, None};
+static int doubleBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16, GLX_DOUBLEBUFFER, None};
+Display *display;
+Window window;
 
 char *testcase = NULL;
 int window_width = 800;
@@ -46,7 +48,7 @@ void parseArgs(int argc, char *argv[])
 }
 
 
-void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t window) {
+void draw() {
     if (NULL != testcase) {
         DRAW_FUNC pf = (DRAW_FUNC)dlsym(0, testcase);
         if (NULL != pf) {
@@ -55,44 +57,9 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
             return;
         }
     }
-
     get_version();
-   
-    xcb_font_t font = xcb_generate_id(connection);
-    xcb_void_cookie_t cookie_font = xcb_open_font_checked(connection, font, strlen(font_name_pattern), font_name_pattern);
-    xcb_generic_error_t *error = xcb_request_check(connection, cookie_font);
-    if (error) {
-        fprintf(stderr, "ERROR: can't open font :%d\n", error->error_code);
-        xcb_disconnect(connection);
-        exit(0);
-    }
-    
-    xcb_gcontext_t gc = xcb_generate_id(connection);
-    uint32_t mask = XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT;
-    uint32_t value_list[3];
-    value_list[0] = screen->black_pixel;
-    value_list[1] = screen->white_pixel;
-    value_list[2] = font;
-    xcb_void_cookie_t cookie_gc = xcb_create_gc_checked(connection, gc, window, mask, value_list);
-    error = xcb_request_check(connection, cookie_gc);
-    if (error) {
-        fprintf(stderr, "ERROR: can't create gc: %d\n", error->error_code);
-        xcb_disconnect(connection);
-        exit(0);
-    }
 
-    cookie_font = xcb_close_font_checked(connection, font);
-    error = xcb_request_check(connection, cookie_font);
-    if (error) {
-        fprintf(stderr, "ERROR: can't close font: %d\n", error->error_code);
-        xcb_disconnect(connection);
-        exit(0);
-    }
-
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glRasterPos2f(0.0f, 0.0f);
-
-    static int isFirstCall = 1;
+    /*static int isFirstCall = 1;
     static GLuint lists;
     //load font
     //gen list
@@ -112,17 +79,9 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
     //unuse font?
     //delete list
     //unload font*/
-
-    cookie_gc = xcb_free_gc(connection, gc);
-    error = xcb_request_check(connection, cookie_gc);
-    if (error) {
-        fprintf(stderr, "ERROR: can't free gc: %d\n", error->error_code);
-        xcb_disconnect(connection);
-        exit(0);
-    }
 }
 
-int main_loop(Display *display, xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t window, GLXDrawable drawable)
+int main_loop(Display *display, xcb_connection_t *connection, xcb_window_t window, GLXDrawable drawable)
 {
     int running = 1;
     while (running) {
@@ -140,7 +99,7 @@ int main_loop(Display *display, xcb_connection_t *connection, xcb_screen_t *scre
                 break;
             case XCB_EXPOSE:
                 /* Handle expose event, draw and swap buffers */
-                draw(connection, screen, window);
+                draw();
                 glXSwapBuffers(display, drawable);
                 break;
             default:
@@ -151,7 +110,7 @@ int main_loop(Display *display, xcb_connection_t *connection, xcb_screen_t *scre
     return 0;
 }
 
-int setup_and_run(Display *display, xcb_connection_t *connection, int default_screen, xcb_screen_t *screen)
+int setup_and_run(Display *display, int default_screen)
 {
     int visualID = 0;
 
@@ -179,19 +138,6 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
         return -1;
     }
 
-    /* Create XID's for colormap and window */
-    xcb_colormap_t colormap = xcb_generate_id(connection);
-    xcb_window_t window  = xcb_generate_id(connection);
-
-    /* Create colormap */
-    xcb_create_colormap(
-        connection,
-        XCB_COLORMAP_ALLOC_NONE,
-        colormap,
-        screen->root,
-        visualID);
-
-    /* Create window */
     uint32_t eventmask = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS;
     uint32_t valuelist[] = {eventmask, colormap, 0};
     uint32_t valuemask = XCB_CW_EVENT_MASK | XCB_CW_COLORMAP;
@@ -235,7 +181,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
     }
 
     /* run main loop */
-    int retval = main_loop (display, connection, screen, window, drawable);
+    int retval = main_loop (display, connection, window, drawable);
 
     /* Cleanup */
     glXDestroyWindow(display, glxwindow);
@@ -246,8 +192,13 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
 
 int main(int argc, char *argv[])
 {
-    Display *display;
-    int default_screen, screen_num;
+    XVisualInfo *vi;
+    Colormap cmap;
+    XSetWindowAttributes swa;
+    GLXContext cx;
+    XEvent event;
+    GLboolean needDraw = GL_FALSE, needUpdate = GL_TRUE;
+    int dummy;
 
     parseArgs(argc, argv);
 
@@ -258,35 +209,116 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Can't open display\n");
         return -1;
     }
-    //font_for_text = XLoadFont(display, font_name_pattern);
 
-    default_screen = DefaultScreen(display);
-
-    /* Get the XCB connection from the display */
-    xcb_connection_t *connection = XGetXCBConnection(display);
-    if (!connection)
-    {
-        XCloseDisplay(display);
-        fprintf(stderr, "Can't get xcb connection from display\n");
+    if(glXQueryExtension(display, &dummy, &dummy)) {
+        fprintf(stderr, "X server has no OpenGL GLX extentions\n");
         return -1;
     }
 
-    /* Acquire event ownership */
-    XSetEventQueueOwner(display, XCBOwnsEventQueue);
-    
-    /* Find XCB screen */
-    xcb_screen_t *screen = 0;
-    xcb_screen_iterator_t screen_iter = xcb_setup_roots_iterator(xcb_get_setup(connection));
-    for (screen_num = default_screen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter));
-    screen = screen_iter.data;
+    vi = glXChooseVisual(dpy, DefaultScreen(display), dblBuf);
+    if (NULL == vi) {
+        vi == glXChooseVisual(display, DefaultScreen(display), snglBuf);
+        if (NULL == vi) {
+            fprintf(stderr, "no RGB visual with depth buffer\n");
+            return -1;
+        }
+        glf_DoubleBuffer = GL_FALSE;
+    }
 
-    /* Initialize window and OpenGL context, run main loop and deinitialize */
-    int retval = setup_and_run(display, connection, default_screen, screen);
+    if (TrueColor != vi->class) {
+        fprintf(stderr, "TrueColor visual required for this program\n");
+        return -1;
+    }
 
-    //XUnloadFont(display, font_for_text);
-    /* Cleanup */
-    XCloseDisplay(display);
+    cx = glXCreateContext(display, vi, None, GL_TRUE);
+    if (NULL == cx) {
+        fprintf(stderr, "could not create rendering context\n");
+        return -1;
+    }
 
-    return retval;
+    cmap = XCreateColormap(display, RootWindow(display, vi->screen), vi->visual, AllocNone);
+    swa.colomap = cmap;
+    swa.border_pixel = 0;
+    swa.event_mask = KeyPressMask | ExposureMask | ButtonPressMask | StructureNotifyMask;
+    win = XCreateWindow(display, RootWindow(display, vi->screen), 0, 0,
+                        glf_WinWidth, glf_WinHeight, 0, vi->depth, InputOutput, vi->visual,
+                        CWBorderPixel | CWColormap | CWEventMask, &swa);
+    XSetStandardProperties(display, window, "main", "main", None, argv, argc, NULL);
+    glXMakeCurrent(display, window, cx);
+    XMapWindow(display, window);
+    glfInit();
+
+    while (1) {
+        do {
+            XNextEvent(display, &event);
+            switch(event.type) {
+                case KeyPress:
+                {
+                    KeySym keysym;
+                    XKeyEvent *kevent;
+                    char buffer[1];
+                    kevent = (XKeyEvent*)&event;
+                    if (XLookupString((XKeyEvent *)&event, buffer, 1, &keysym, NULL) == 1) {
+                        glfProcessKeyboard(keysym);
+                        needUpdate = GL_TRUE;
+                        break;
+                    }
+                }
+                case ButtonPress:
+                {
+                    glfProcessMousePress(event.xbutton.x, event.xbutton.y);
+                    needUpdate = GL_TRUE;
+                    break;
+                }
+                case ConfigureNotify:
+                    glfReshape(event.xconfigure.width, event.xconfigure.height);
+                    break;
+                case Expose:
+                    needDraw = GL_TRUE;
+                    break;
+            }
+        }while(XPending(display));
+
+        if (needUpdate) {
+            glfUpdate()
+            needUpdate = GL_FALSE;
+            needDraw = GL_TRUE;
+        }
+        if (needDraw) {
+            glDraw();
+            needDraw = GL_FALSE;
+        }
+    }
+    return 0;
+}
+
+void glfInit() 
+{
+}
+
+void glProcessKeyboard(KeySym keysym)
+{
+    if (keysym == (KeySym)XK_Escapse)
+        exit(0);
+}
+
+void glProcessMousePress(int x, int y)
+{
+}
+
+void glfUpdate()
+{
+}
+void glfReshape(int width, int height)
+{
+    glf_WinWidth = width;
+    glf_WinHeight = height;
+    glViewPort(0, 0, glf_WinWidth, glf_WinHeight);
+}
+
+void glfDraw()
+{
+    glClearColor(0.0, 0.0, 0.0, 0.0);
+    glClear(GL_COLOR_BUFFER_BIT);
 }
 
