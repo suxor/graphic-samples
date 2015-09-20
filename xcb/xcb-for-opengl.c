@@ -56,7 +56,7 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
         }
     }
 
-    get_version();
+    //get_version();
    
     xcb_font_t font = xcb_generate_id(connection);
     xcb_void_cookie_t cookie_font = xcb_open_font_checked(connection, font, strlen(font_name_pattern), font_name_pattern);
@@ -88,6 +88,8 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
         xcb_disconnect(connection);
         exit(0);
     }
+    glClearColor(1.0, 1.0, 1.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     glColor3f(1.0f, 0.0f, 0.0f);
     glRasterPos2f(0.0f, 0.0f);
@@ -96,17 +98,18 @@ void draw(xcb_connection_t *connection, xcb_screen_t *screen, xcb_window_t windo
     static GLuint lists;
     //load font
     //gen list
-    //if (isFirstCall) {
-        lists = glGenLists(128);
-        glXUseXFont(font_for_text, 0, 128, lists);
-    //}
+    if (isFirstCall) {
+        lists = glGenLists(256);
+        glXUseXFont(font_for_text, 0, 256, lists);
+    }
 
     char *str = "Hello, world";
     for (; *str!='\0';++str) {
         glCallList(lists + *str);
     }
+    glFlush();
 
-    glDeleteLists(lists, 128);
+    //glDeleteLists(lists, 256);
     //use font
     //draw text
     //unuse font?

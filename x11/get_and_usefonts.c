@@ -50,9 +50,15 @@ int main(int argc, char *argv[])
     fprintf(stdout, "sizeof Font is %d\n", sizeof(Font));
     for (i = 0; i < count_returned; i ++) {
         fprintf(stdout, 
-                "font name: %s, font id: %#x\n",
+                "font name: %s, font id: %#x, %d, %d, %d, %d, %d, %#x\n",
                 fontslist[i],
-                (unsigned int)(structLists[i].fid));
+                (unsigned int)(structLists[i].fid),
+                structLists[i].min_char_or_byte2,
+                structLists[i].max_char_or_byte2,
+                structLists[i].min_byte1,
+                structLists[i].max_byte1,
+                structLists[i].default_char,
+                structLists[i].per_char);
         Font font = XLoadFont(display, fontslist[i]);
         fprintf(stdout, "result of XLoadFont is: %#x\n", (unsigned int)(font));
         XUnloadFont(display, font);
