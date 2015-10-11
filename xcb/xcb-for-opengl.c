@@ -256,6 +256,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
     drawable = glxwindow;
 
     /* make OpenGL context current */
+    #if 1
     if (!glXMakeContextCurrent(display, drawable, drawable, context))
     {
         xcb_destroy_window(connection, window);
@@ -263,6 +264,15 @@ int setup_and_run(Display *display, xcb_connection_t *connection, int default_sc
         fprintf(stderr, "glXMakeContextCurrent failed\n");
         return -1;
     }
+    #else
+    if (!glXMakeCurrent(display, drawable, context))
+    {
+        xcb_destroy_window(connection, window);
+        glXDestroyContext(display, context);
+        fprintf(stderr, "glXMakeContextCurrent failed\n");
+        return -1;
+    }
+    #endif
 
     /* run main loop */
     int retval = main_loop (display, connection, screen, window, drawable);

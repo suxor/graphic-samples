@@ -12,7 +12,7 @@
 typedef void (*DRAW_FUNC)();
 
 static int snglBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16, None};
-static int dblBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16, GLX_DOUBLEBUFFER, None};
+static int dblBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
 Display *display;
 Window window;
 
@@ -21,7 +21,7 @@ int window_width = 800;
 int window_height = 600;
 Font font_for_text = 0;
 char *font_name_pattern = NULL;
-
+#if 1
 void glfInit() 
 {
 /*    glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -48,13 +48,17 @@ void glfReshape(int width, int height)
     glf_WinHeight = height;
     glViewPort(0, 0, glf_WinWidth, glf_WinHeight);*/
 }
+#endif
 
+GLubyte letters[][13] = {
+    {0x00, 0x00, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0x66, 0x3c, 0x18},
+};
 void glfDraw()
 {
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
-    glFlush;
-
+    glFlush();
+#if 1 
     glColor3f(1.0f, 0.0f, 0.0f);
     glRasterPos2f(0.0f, 0.0f);
     glPushAttrib(GL_LIST_BIT);
@@ -79,7 +83,7 @@ void glfDraw()
     glCallLists(strlen(str), GL_UNSIGNED_BYTE, str);
     glPopAttrib();
     glFlush();
-
+#endif
 }
 
 
@@ -130,10 +134,10 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    /*if(glXQueryExtension(display, &dummy, &dummy)) {
+    if(!glXQueryExtension(display, &dummy, &dummy)) {
         fprintf(stderr, "X server has no OpenGL GLX extentions\n");
         return -1;
-    }*/
+    }
 
     vi = glXChooseVisual(display, DefaultScreen(display), dblBuf);
     if (NULL == vi) {
@@ -149,8 +153,25 @@ int main(int argc, char *argv[])
         fprintf(stderr, "TrueColor visual required for this program\n");
         return -1;
     }
+#ifdef TEST001
+    GLXFBConfig *fb_configs = 0;
+    int num_fb_configs = 0;
+    fb_configs = glXGetFBConfigs(display, DefaultScreen(display), &num_fb_configs);
+    if (!fb_configs || num_fb_configs == 0) {
+        fprintf(stderr, "glXGetFBConfig failed\n");
+	return -1;
+    }
 
+    GLXFBConfig fb_config = fb_configs[0];
+    //glXGetFBConfigAttrib(display, fb_config, GLX_VISUAL_ID, &visualID);
+
+#endif
+
+#ifdef TEST001
+    cx = glXCreateNewContext(display, fb_config, GLX_RGBA_TYPE, 0, GL_TRUE);
+#else
     cx = glXCreateContext(display, vi, None, GL_TRUE);
+#endif
     if (NULL == cx) {
         fprintf(stderr, "could not create rendering context\n");
         return -1;
@@ -164,22 +185,47 @@ int main(int argc, char *argv[])
                         window_width, window_height, 0, vi->depth, InputOutput, vi->visual,
                         CWBorderPixel | CWColormap | CWEventMask, &swa);
     XSetStandardProperties(display, window, "main", "main", None, argv, argc, NULL);
-    glXMakeCurrent(display, window, cx);
     XMapWindow(display, window);
-    //glfInit();
 
     font_for_text = XLoadFont(display, font_name_pattern);
+#ifdef TEST001
+     GLXWindow glxwindow = glXCreateWindow(display, fb_config, window, 0);
+     if (!glxwindow)
+     {
+	 glXDestroyContext(display, cx);
+	 fprintf(stderr, "glXCreateWindow failed\n");
+	 return -1;
+     }
+
+    glXMakeContextCurrent(display, glxwindow, glxwindow, cx);
+#else
+    glXMakeCurrent(display, window, cx);
+#endif
+    //glfInit();
+
+    fprintf(stderr, 
+           "gl_verdor: %s\n"
+           "gl_renderer: %s\n"
+           "gl_version: %s\n"
+           "glsl_version: %s\n", 
+           //"gl_extensions: \n%s\n",
+           glGetString(GL_VENDOR),
+           glGetString(GL_RENDERER),
+           glGetString(GL_VERSION),
+           //glGetString(GL_EXTENSIONS),
+           glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+    //font_for_text = XLoadFont(display, font_name_pattern);
 
     glfDraw();
 
     glXSwapBuffers(display, window);
 
-    pause();
+    //pause();
 
-    XUnloadFont(display, font_for_text);
+    //XUnloadFont(display, font_for_text);
 
-    XCloseDisplay(display);
-#if 0
+#if 1
     while (1) {
         do {
             XNextEvent(display, &event);
@@ -223,6 +269,8 @@ int main(int argc, char *argv[])
         }
     }
 #endif
+    XUnloadFont(display, font_for_text);
+    XCloseDisplay(display);
     return 0;
 }
 

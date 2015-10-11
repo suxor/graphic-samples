@@ -5,13 +5,23 @@ CFLAGS = -g $(INCLUDE_PATH)
 LDFLAGS = -Wl,-E -lGL -lxcb -lX11-xcb -lX11 -lm  -ldl
 
 
-objects = opengl/draw-circle.o opengl/get-version.o xcb/xcb-for-opengl.o
+globjects = opengl/draw-circle.o opengl/get-version.o 
+xcbobjects = xcb/xcb-for-opengl.o 
+x11objects = x11/x11-for-opengl.o 
+objects = $(globjects) $(x11objects) $(xcbobjects)
 
-prog = test 
+x11prog = x11test 
+xcbprog = xcbtest 
 
-all:$(objects)
-	$(CC) -o $(prog) $(objects) $(LDFLAGS)
-	rm $(objects)
+all:$(x11prog) $(xcbprog)
+
+$(x11prog):$(x11objects) $(globjects)
+	$(CC) -o $(x11prog) $(x11objects) $(globjects) $(LDFLAGS)
+	#rm $(x11objects)
+
+$(xcbprog):$(xcbobjects) $(globjects)
+	$(CC) -o $(xcbprog) $(xcbobjects) $(globjects) $(LDFLAGS)
+	#rm $(xcbobjects)
 
 $(objects):%.o:%.c
 	$(CC) $(CFLAGS) -c $< -o $@
