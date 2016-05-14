@@ -7,19 +7,16 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <GL/glx.h>
-//#include <GL/gl.h>
 
-typedef void (*DRAW_FUNC)();
+typedef void (*DRAW_FUNC)(void);
 
 static int snglBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16, None};
 static int dblBuf[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
 
-
+char *testlib = NULL;
 char *testcase = NULL;
 int window_width = 800;
 int window_height = 600;
-Font font_for_text = 0;
-char *font_name_pattern = NULL;
 
 void glfInit() 
 {
@@ -48,14 +45,23 @@ void glfReshape(int width, int height)
     glViewPort(0, 0, glf_WinWidth, glf_WinHeight);*/
 }
 
-GLubyte letters[][13] = {
-    {0x00, 0x00, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0x66, 0x3c, 0x18},
-};
 void glfDraw()
 {
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
     glFlush();
+
+    if (NULL != testcase) {
+        void *handle = dlopen(testlib, RTLD_NOW | RTLD_GLOBAL);
+	if (NULL == handle) {
+	    printf("open library[%s] failed: %s", testlib, dlerror());
+	    return;
+        }
+
+	DRAW_FUNC pf = (DRAW_FUNC)dlsym(handle, testcase);
+	if (NULL != pf) pf();
+	else printf("testcase[%s] in testlib[%s] dosn't exist.", testcase, testlib);
+    }
 }
 
 
@@ -74,8 +80,8 @@ void parseArgs(int argc, char *argv[])
         case 't':
             testcase = optarg;
             break;
-        case 'p':
-            font_name_pattern = optarg;
+        case 'l':
+            testlib = optarg;
             break;
         default:
             fprintf(stderr, "unknown option character %c", oc);
