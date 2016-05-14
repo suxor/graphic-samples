@@ -1,0 +1,2 @@
+gcc -g get_and_usefonts.c -o get_and_usefonts -lX11 
+./get_and_usefonts -n 100 -p "*"
