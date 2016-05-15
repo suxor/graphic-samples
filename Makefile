@@ -1,11 +1,11 @@
 
 CC = gcc
-INCLUDE_PATH = -Iopengl
+INCLUDE_PATH = -Iopengl -Iassimp
 CFLAGS = -g $(INCLUDE_PATH)
-LDFLAGS = -Wl,-E -lGL -lxcb -lX11-xcb -lX11 -lm  -ldl
+LDFLAGS = -Wl,-E -lGL -lGLU -lassimp -lxcb -lX11-xcb -lX11 -lm  -ldl 
 
 
-globjects = opengl/draw_circle.o opengl/get_version.o opengl/draw_bezier_surface.o opengl/draw_sphere.c
+globjects = opengl/draw_circle.o opengl/get_version.o opengl/draw_bezier_surface.o opengl/draw_sphere.o opengl/load_file_by_assimp.o
 xcbobjects = xcb/xcb-for-opengl.o 
 x11objects = x11/x11-for-opengl.o 
 objects = $(globjects) $(x11objects) $(xcbobjects)

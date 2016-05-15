@@ -54,13 +54,13 @@ void glfDraw()
     if (NULL != testcase) {
         void *handle = dlopen(testlib, RTLD_NOW | RTLD_GLOBAL);
 	if (NULL == handle) {
-	    printf("open library[%s] failed: %s", testlib, dlerror());
+	    fprintf(stderr, "open library[%s] failed: %s", testlib, dlerror());
 	    return;
         }
 
 	DRAW_FUNC pf = (DRAW_FUNC)dlsym(handle, testcase);
 	if (NULL != pf) pf();
-	else printf("testcase[%s] in testlib[%s] dosn't exist.", testcase, testlib);
+	else fprintf(stderr, "testcase[%s] in testlib[%s] dosn't exist.", testcase, testlib);
     }
 }
 
